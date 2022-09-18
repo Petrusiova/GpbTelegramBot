@@ -1,97 +1,105 @@
-﻿# import schedule
-import telebot
-from datetime import datetime
+﻿from datetime import datetime
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
 
-bot = telebot.TeleBot('5658251229:AAGoAE5S6udqEHHouIFinjzwQcTm8I4e0BM')
+bot = Bot('5658251229:AAGoAE5S6udqEHHouIFinjzwQcTm8I4e0BM')
+dp = Dispatcher(bot)
 ids = []
 texts = {}
 forms = {}
 
 
-@bot.message_handler(content_types=["new_chat_members"])
-def new_member(message):
+@dp.message_handler(content_types=["new_chat_members"])
+async def new_member(message: types.Message):
     id = message.new_chat_members[0].id
-
-
     try:
         name = message.new_chat_members[0].first_name
 
         ids.append(id)
 
-        mes_ = bot.send_message(message.chat.id, f"Добро пожаловать, @{name}!"
-                                                 f"\nУ нас здесь круто, но есть правило: прежде чем войти, необходимо рассказать о себе"
-                                                 f"\n(У тебя 240 секунд и минимум 15 символов)")
-        texts[id] = []
-        texts[id].append(mes_.id)
-        mes_ = bot.send_message(message.chat.id, "Как тебя зовут? \nИз какого ты подразделения? \nКакая у тебя роль в банке? \nРасскажи о своих хобби?")
+        mes_ = await bot.send_message(message.chat.id, f"Добро пожаловать, @{name}!"
+                                                       f"\nЧтобы все участники знали кто есть кто, мы ввели правило: прежде чем войти, необходимо рассказать о себе")
 
-        texts[id].append(mes_.id)
+        texts[id] = []
+        texts[id].append(mes_["message_id"])
+        mes_ = await bot.send_message(message.chat.id,
+                                      "Как тебя зовут? \nИз какого ты подразделения? \nКакая у тебя роль в банке? \nРасскажи о своих хобби?"
+                                      "Пожалуйста, напиши ответ в одном сообщении (не менее 15 символов). Мы будем ждать твой ответ (целых 240 секунд!)")
+
+        texts[id].append(mes_["message_id"])
         forms[id] = datetime.now()
 
-    except:
-        check_time(message)
+    except Exception as e:
+        print(e)
+        await check_time(message)
 
 
-@bot.message_handler(content_types=['text'])
-def start(message):
-    check_time(message)
-
+@dp.message_handler(content_types=['text'])
+async def start(message):
     id = message.from_user.id
     if id in ids:
+        await check_time(message)
         try:
             if (datetime.now() - forms[id]).total_seconds() <= 240:
                 if len(message.text) >= 15:
-                    delete_previous(id, message)
+                    await delete_previous(id, message)
                 else:
-                    bot.kick_chat_member(message.chat.id, id)
+                    await bot.kick_chat_member(message.chat.id, id)
+        except Exception as e:
+            print(e)
 
-        except:
+
+async def check_time(message):
+    id = message.from_user.id
+    if id in ids:
+        try:
+            for id, start in forms.items():
+                if (datetime.now() - forms[id]).total_seconds() > 240:
+                    await bot.kick_chat_member(message.chat.id, id)
+                    await delete_previous(id, message)
+                    await bot.delete_message(message.chat.id, message["message_id"])
+                    await bot.send_message(message.chat.id,
+                                           f" @{message.from_user.first_name} не поздоровался и его пришлось удалить")
+        except Exception as e:
+            print(e)
             pass
 
-
-def check_time(message):
-    for id, start in forms.items():
-        if (datetime.now() - forms[id]).total_seconds() > 240:
-            delete_previous(id, message)
-            bot.kick_chat_member(message.chat.id, id)
-
-
-# @bot.message_handler(content_types=['text'])
-# def next_method(message):
+# @dp.message_handler(content_types=['text'])
+# async def next_method(message):
 #     id = message.from_user.id
 #     try:
 #         if message.from_user.id in ids:
 #             forms[id].append(message.text)
 #             texts[id].append(message.id)
-#             mes_ = bot.send_message(message.chat.id, "Кем ты работаешь?")
+#             mes_ = await message.answer(message.chat.id, "Кем ты работаешь?")
 #             texts[id].append(mes_.id)
 #         bot.register_next_step_handler(message=message, callback=next_method_2)
 #     except:
 #         delete_previous(id, message)
 #
 #
-# @bot.message_handler(content_types=['text'])
-# def next_method_2(message):
+# @dp.message_handler(content_types=['text'])
+# async def next_method_2(message):
 #     id = message.from_user.id
 #     try:
 #         if message.from_user.id in ids:
 #             forms[id].append(message.text)
 #             texts[id].append(message.id)
-#             mes_ = bot.send_message(message.chat.id, "Чем ты увлекаешься?")
+#             mes_ = await message.answer(message.chat.id, "Чем ты увлекаешься?")
 #             texts[id].append(mes_.id)
 #         bot.register_next_step_handler(message=message, callback=next_method_3)
 #     except:
 #         delete_previous(id, message)
 #
 #
-# @bot.message_handler(content_types=['text'])
-# def next_method_3(message):
+# @dp.message_handler(content_types=['text'])
+# async def next_method_3(message):
 #     id = message.from_user.id
 #     try:
 #         if message.from_user.id in ids:
 #             forms[id].append(message.text)
 #             texts[id].append(message.id)
-#             bot.send_message(message.chat.id,
+#             await message.answer(message.chat.id,
 #                              "К нам присоединился(ась) " + str(forms[id][0]) + " из " + str(
 #                                  forms[id][1]) + ", он(а) работает " + str(forms[id][2]) + " и увлекается " + (
 #                              forms[id][3]))
@@ -99,13 +107,25 @@ def check_time(message):
 #         delete_previous(id, message)
 
 
-def delete_previous(id, message):
-    for i in texts[id]:
-        bot.delete_message(message.chat.id, i)
-    ids.remove(id)
-    forms.__delitem__(id)
-    texts.__delitem__(id)
-    bot.register_next_step_handler(message=message, callback=start)
+async def delete_previous(id, message):
+    try:
+        if texts[id] is not None:
+            for i in texts[id]:
+                await bot.delete_message(message.chat.id, i)
+        if ids is not None:
+            async with ids:
+                ids.remove(id)
+        if forms is not None:
+            async with forms:
+                forms.__delitem__(id)
+        if texts is not None:
+            async with texts:
+                texts.__delitem__(id)
+    # bot.register_next_step_handler(message=message, callback=start)
+    except Exception as e:
+        print(e)
+        pass
 
 
-bot.polling(none_stop=True)
+if __name__ == "__main__":
+    executor.start_polling(dp, on_startup=print("Бот запущен " + str(datetime.now())))
